@@ -12,7 +12,7 @@
 .venv
 *.h5
 *.csv
-
+aaa.py
 # User-specific files (MonoDevelop/Xamarin Studio)
 *.userprefs
 

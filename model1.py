@@ -23,9 +23,10 @@ model.compile(optimizer="adam", loss="sparse_categorical_crossentropy", metrics=
 
 def train():
     model.fit(X, y, batch_size=64, epochs=1)
+    model.save_weights("model1.h5")
 
 def load():
-    model.load_weights("predict_letter.h5")
+    model.load_weights("model1.h5")
 
 #load()
 train()
