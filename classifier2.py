@@ -11,24 +11,12 @@ print("Loading datasets...")
 advers_df = pd.read_csv("advers.csv")
 majestic_df = pd.read_csv("majestic_million.csv")
 
-# Assign labels
-advers_df['label'] = 0
-majestic_df['label'] = 1
-
-# Select relevant columns and limit the size
-advers_df = advers_df[["domain", 'label']]
-majestic_df = majestic_df[["domain", 'label']]
-
-# Balancing the dataset for simplicity
-advers_df = advers_df.iloc[:2000]
-majestic_df = majestic_df.iloc[:2000]
-
-# Combine and shuffle
-combined_df = pd.concat([advers_df, majestic_df], ignore_index=True)
-combined_df = combined_df.sample(frac=1).reset_index(drop=True)
+full_df = pd.read_csv("dga_domains_full.csv", names=["label", "source", "domain"])
+full_df = full_df[["label", "domain"]]
+full_df['label'] = full_df['label'].replace({'legit': 1, 'dga': 0})
 
 # Tokenize domain names
-domains = combined_df['domain'].values
+domains = full_df['domain'].values
 tokenizer = Tokenizer(char_level=True)
 tokenizer.fit_on_texts(domains)
 sequences = tokenizer.texts_to_sequences(domains)
@@ -38,7 +26,7 @@ max_length = max([len(seq) for seq in sequences])
 X = pad_sequences(sequences, maxlen=max_length, padding='post')
 
 # Labels
-labels = combined_df['label'].values
+labels = full_df['label'].values
 
 # Split the data
 X_train, X_val, y_train, y_val = train_test_split(X, labels, test_size=0.2, random_state=42)
@@ -51,10 +39,13 @@ embedding_size = 128
 model = Sequential()
 model.add(Embedding(max_features, embedding_size, input_length=max_length))
 model.add(SpatialDropout1D(0.2))
+model.add(LSTM(100, dropout=0.2, recurrent_dropout=0.2, return_sequences=True))
 model.add(LSTM(100, dropout=0.2, recurrent_dropout=0.2))
 model.add(Dense(1, activation='sigmoid'))
 
 model.compile(loss='binary_crossentropy', optimizer='adam', metrics=['accuracy'])
 
 # Train the model
-model.fit(X_train, y_train, validation_data=(X_val, y_val), epochs=10, batch_size=64)
+model.fit(X_train, y_train, validation_data=(X_val, y_val), epochs=2, batch_size=64)
+
+model.save_weights("classifier.h5")
