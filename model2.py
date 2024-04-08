@@ -4,10 +4,8 @@ from tensorflow.keras.models import Sequential
 from tensorflow.keras.preprocessing.sequence import pad_sequences
 import pandas as pd
 import numpy as np
-from classifier import *
 from read_csv import *
 
-vocab_size = 128
 maxlen = 10
 
 words = readdata()
@@ -64,65 +62,39 @@ class PositionalEncoding(tf.keras.layers.Layer):
         return x + self.pos_encoding[:, :tf.shape(x)[1], :]
 
 
-d_model = 32
-num_heads = 2
-dff = 128
+class Model2():
+    def __init__(self, d_model=32, num_heads=2, dff=128, vocab_size=128, ):
+        self.model = Sequential([
+            Embedding(input_dim=vocab_size, output_dim=d_model, input_length=maxlen),
+            PositionalEncoding(maxlen, d_model),
+            TransformerEncoderLayer(d_model=d_model, num_heads=num_heads, dff=dff),
+            tf.keras.layers.GlobalAveragePooling1D(),
+            Dense(vocab_size, activation='softmax')
+            ])
+        self.model.compile(optimizer="adam", loss="sparse_categorical_crossentropy", metrics=["accuracy"])
 
-model = Sequential([
-    Embedding(input_dim=vocab_size, output_dim=d_model, input_length=maxlen),
-    PositionalEncoding(maxlen, d_model),  # Add this line
-    TransformerEncoderLayer(d_model=d_model, num_heads=num_heads, dff=dff),
-    tf.keras.layers.GlobalAveragePooling1D(),
-    Dense(vocab_size, activation='softmax')
-])
+    def train(self):
+        self.model.fit(X, y, batch_size=64, epochs=1)
+        self.model.save_weights("model2.h5")
 
+    def load(self):
+        self.model.load_weights("model2.h5")
 
-model.compile(optimizer="adam", loss="sparse_categorical_crossentropy", metrics=["accuracy"])
+    def predict(self, index_max=20):
+        predicted = []
+        index = 0
+        for word in readdata():
+            word = word.split('.')[0]
+            input_word = [ord(char) for char in word.lower()]
+            input_word = pad_sequences([input_word], maxlen=maxlen)  
+            predicted_index = np.argmax(self.model.predict(input_word))
+            predicted_letter = chr(predicted_index)
+            predicted.append(word + predicted_letter)
+            index += 1
+            if index > index_max:
+                break
+        return predicted
 
-def train():
-    model.fit(X, y, batch_size=64, epochs=1)
-    model.save_weights("model4.h5")
-
-def load():
-    model.load_weights("model4.h5")
-
-load()
-#train()
-
-predicted = []
-index_max = 20
-index = 0
-for word in readdata():
-    word = word.split('.')[0]
-    input_word = [ord(char) for char in word.lower()]
-    input_word = pad_sequences([input_word], maxlen=maxlen)  
-    predicted_index = np.argmax(model.predict(input_word))
-    predicted_letter = chr(predicted_index)
-    predicted.append(word + predicted_letter)
-    index += 1
-    if index > index_max:
-        break
-
-classifier = train_classifier()
-
-data = { "domain": predicted }
-df = pd.DataFrame(data)
-df["label"] = 0
-X = np.array([extract_features(domain) for domain in df['domain']])
-y = df['label'].values
-
-print(df)
-predictions = classifier.predict(X)
-print(predictions)
-print(classification_report(y, predictions))
-
-data = { "domain": words[:20] }
-df = pd.DataFrame(data)
-df["label"] = 1
-y = df['label'].values
-
-X = np.array([extract_features(domain) for domain in df['domain']])
-print(df)
-predictions = classifier.predict(X)
-print(predictions)
-print(classification_report(y, predictions))
+model = Model2()
+model.train()
+print(model.predict())

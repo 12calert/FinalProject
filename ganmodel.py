@@ -1,76 +1,77 @@
 import tensorflow as tf
-import glob
-import imageio
-import matplotlib.pyplot as plt
-import numpy as np
-import os
-import PIL
 from tensorflow.keras import layers
+import numpy as np
 import time
+from read_csv import *
 
-from IPython import display
-
-(train_images, train_labels), (_, _) = tf.keras.datasets.mnist.load_data()
-
-train_images = train_images.reshape(train_images.shape[0], 28, 28, 1).astype('float32')
-train_images = (train_images - 127.5) / 127.5  # Normalize the images to [-1, 1]
-
-BUFFER_SIZE = 60000
+char_set = "abcdefghijklmnopqrstuvwxyz0123456789-"
+char_set_size = len(char_set)
+domain_length = 10
+BUFFER_SIZE = 10000
 BATCH_SIZE = 256
+EPOCHS = 15
+noise_dim = 100
+num_examples_to_generate = 16
 
-# Batch and shuffle the data
-train_dataset = tf.data.Dataset.from_tensor_slices(train_images).shuffle(BUFFER_SIZE).batch(BATCH_SIZE)
+def domain_to_one_hot(domains):
+    one_hot = np.zeros((len(domains), domain_length, char_set_size), dtype=np.float32)
+    for i, domain in enumerate(domains):
+        for j, char in enumerate(domain):
+            if j < domain_length:
+                one_hot[i, j, char_set.index(char)] = 1.0
+    return one_hot
+
+def one_hot_to_domain(one_hot_domains):
+    domain_names = []
+    for domain in one_hot_domains:
+        domain_array = domain.numpy()
+        char_indices = domain_array.argmax(axis=-1)
+        domain_name = ''.join(char_set[index] for index in char_indices)
+        domain_names.append(domain_name.rstrip('-'))
+    return domain_names
+
+def load_domain_dataset():
+    domains = readdata()
+    domains = remove_dot( domains )
+    domains = domains[:BUFFER_SIZE]
+    return domain_to_one_hot(domains)
+
+train_domains = load_domain_dataset()
+
+train_dataset = tf.data.Dataset.from_tensor_slices(train_domains).shuffle(BUFFER_SIZE).batch(BATCH_SIZE)
 
 def make_generator_model():
-    model = tf.keras.Sequential()
-    model.add(layers.Dense(7*7*256, use_bias=False, input_shape=(100,)))
-    model.add(layers.BatchNormalization())
-    model.add(layers.LeakyReLU())
+    model = tf.keras.Sequential([
+        layers.Dense(256, use_bias=False, input_shape=(noise_dim,)),
+        layers.BatchNormalization(),
+        layers.LeakyReLU(),
 
-    model.add(layers.Reshape((7, 7, 256)))
-    assert model.output_shape == (None, 7, 7, 256)  # Note: None is the batch size
+        layers.Dense(512, use_bias=False),
+        layers.BatchNormalization(),
+        layers.LeakyReLU(),
 
-    model.add(layers.Conv2DTranspose(128, (5, 5), strides=(1, 1), padding='same', use_bias=False))
-    assert model.output_shape == (None, 7, 7, 128)
-    model.add(layers.BatchNormalization())
-    model.add(layers.LeakyReLU())
+        layers.Dense(domain_length * char_set_size, activation='softmax'),
+        layers.Reshape((domain_length, char_set_size))
+    ])
+    return model
 
-    model.add(layers.Conv2DTranspose(64, (5, 5), strides=(2, 2), padding='same', use_bias=False))
-    assert model.output_shape == (None, 14, 14, 64)
-    model.add(layers.BatchNormalization())
-    model.add(layers.LeakyReLU())
+def make_discriminator_model():
+    model = tf.keras.Sequential([
+        layers.Flatten(input_shape=(domain_length, char_set_size)),
+        layers.Dense(512),
+        layers.LeakyReLU(),
+        layers.Dropout(0.3),
 
-    model.add(layers.Conv2DTranspose(1, (5, 5), strides=(2, 2), padding='same', use_bias=False, activation='tanh'))
-    assert model.output_shape == (None, 28, 28, 1)
+        layers.Dense(256),
+        layers.LeakyReLU(),
+        layers.Dropout(0.3),
 
+        layers.Dense(1)
+    ])
     return model
 
 generator = make_generator_model()
-
-noise = tf.random.normal([1, 100])
-generated_image = generator(noise, training=False)
-
-plt.imshow(generated_image[0, :, :, 0], cmap='gray')
-
-def make_discriminator_model():
-    model = tf.keras.Sequential()
-    model.add(layers.Conv2D(64, (5, 5), strides=(2, 2), padding='same',
-                                     input_shape=[28, 28, 1]))
-    model.add(layers.LeakyReLU())
-    model.add(layers.Dropout(0.3))
-
-    model.add(layers.Conv2D(128, (5, 5), strides=(2, 2), padding='same'))
-    model.add(layers.LeakyReLU())
-    model.add(layers.Dropout(0.3))
-
-    model.add(layers.Flatten())
-    model.add(layers.Dense(1))
-
-    return model
-
 discriminator = make_discriminator_model()
-decision = discriminator(generated_image)
-print (decision)
 
 # This method returns a helper function to compute cross entropy loss
 cross_entropy = tf.keras.losses.BinaryCrossentropy(from_logits=True)
@@ -87,28 +88,21 @@ def generator_loss(fake_output):
 generator_optimizer = tf.optimizers.Adam(1e-4)
 discriminator_optimizer = tf.optimizers.Adam(1e-4)
 
-EPOCHS = 2
-noise_dim = 100
-num_examples_to_generate = 16
-
-# You will reuse this seed overtime (so it's easier)
-# to visualize progress in the animated GIF)
+# Use this seed to visualize progress in the generated data
 seed = tf.random.normal([num_examples_to_generate, noise_dim])
 
-# Notice the use of `tf.function`
-# This annotation causes the function to be "compiled".
 @tf.function
-def train_step(images):
+def train_step(domains):
     noise = tf.random.normal([BATCH_SIZE, noise_dim])
 
     with tf.GradientTape() as gen_tape, tf.GradientTape() as disc_tape:
-      generated_images = generator(noise, training=True)
+        generated_domains = generator(noise, training=True)
 
-      real_output = discriminator(images, training=True)
-      fake_output = discriminator(generated_images, training=True)
+        real_output = discriminator(domains, training=True)
+        fake_output = discriminator(generated_domains, training=True)
 
-      gen_loss = generator_loss(fake_output)
-      disc_loss = discriminator_loss(real_output, fake_output)
+        gen_loss = generator_loss(fake_output)
+        disc_loss = discriminator_loss(real_output, fake_output)
 
     gradients_of_generator = gen_tape.gradient(gen_loss, generator.trainable_variables)
     gradients_of_discriminator = disc_tape.gradient(disc_loss, discriminator.trainable_variables)
@@ -117,48 +111,27 @@ def train_step(images):
     discriminator_optimizer.apply_gradients(zip(gradients_of_discriminator, discriminator.trainable_variables))
 
 def train(dataset, epochs):
-  for epoch in range(epochs):
-    start = time.time()
+    for epoch in range(epochs):
+        start = time.time()
+        for domain_batch in dataset:
+            train_step(domain_batch)
+        print ('Time for epoch {} is {} sec'.format(epoch + 1, time.time()-start))
+    generator.save_weights("ganmodel.h5")
 
-    print("Train epoch ", epoch + 1 )
-    for image_batch in dataset:
-      train_step(image_batch)
+def generate_domain_names(num_samples):
 
-    # Produce images for the GIF as you go
-    display.clear_output(wait=True)
-    generate_and_save_images(generator,
-                             epoch + 1,
-                             seed)
+    noise = tf.random.normal([num_samples, noise_dim])
+    generated_domains_one_hot = generator(noise, training=False)
+    domain_names = one_hot_to_domain(generated_domains_one_hot)
+    return domain_names
 
+def load():
+    generator.load_weights("ganmodel.h5")
 
-    print ('Time for epoch {} is {} sec'.format(epoch + 1, time.time()-start))
-
-  # Generate after the final epoch
-  display.clear_output(wait=True)
-  generate_and_save_images(generator,
-                           epochs,
-                           seed)
-  
-def generate_and_save_images(model, epoch, test_input):
-  # Notice `training` is set to False.
-  # This is so all layers run in inference mode (batchnorm).
-  predictions = model(test_input, training=False)
-
-  fig = plt.figure(figsize=(4, 4))
-
-  for i in range(predictions.shape[0]):
-      plt.subplot(4, 4, i+1)
-      plt.imshow(predictions[i, :, :, 0] * 127.5 + 127.5, cmap='gray')
-      plt.axis('off')
-
-  plt.savefig('image_at_epoch_{:04d}.png'.format(epoch))
-  plt.show()
-
-train(train_dataset, EPOCHS)
-
-
-  # Display a single image using the epoch number
-def display_image(epoch_no):
-  return PIL.Image.open('image_at_epoch_{:04d}.png'.format(epoch_no))
-
-display_image(EPOCHS)
+load()    
+# 5.8s per epoch on laptop
+#train(train_dataset, EPOCHS)
+# Now, let's generate some domain names
+generated_domain_names = generate_domain_names(10)
+for domain_name in generated_domain_names:
+    print(domain_name)

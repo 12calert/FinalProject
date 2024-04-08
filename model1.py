@@ -1,42 +1,47 @@
 import tensorflow as tf
-from tensorflow.keras.layers import Embedding, LSTM, Dense
-from tensorflow.keras.models import Sequential
+from tensorflow.keras.layers import Embedding, LSTM, Dense, Dropout
 from tensorflow.keras.preprocessing.sequence import pad_sequences
-import pandas as pd
 import numpy as np
 from read_csv import *
 
-vocab_size = 128  # Assuming ASCII
-maxlen = 10  # Max length of input word
+maxlen = 10
 
 words = readdata()
 X, y = generate_data(words, maxlen=maxlen)
 
-model = tf.keras.Sequential([
-    Embedding(input_dim=vocab_size, output_dim=32, input_length=maxlen),
-    LSTM(units=128, return_sequences=True),
-    LSTM(units=128),
-    Dense(vocab_size, activation='softmax')
-])
+class Model1():
+    def __init__(self, vocab_size=128):
+        self.model = tf.keras.Sequential([
+            Embedding(input_dim=vocab_size, output_dim=32, input_length=maxlen),
+            LSTM(units=128, return_sequences=True),
+            Dropout(0.2),
+            LSTM(units=128),
+            Dense(vocab_size, activation='softmax')
+        ])
+        self.model.compile(optimizer="adam", loss="sparse_categorical_crossentropy", metrics=["accuracy"])
 
-model.compile(optimizer="adam", loss="sparse_categorical_crossentropy", metrics=["accuracy"])
+    def train(self):
+        self.model.fit(X, y, batch_size=64, epochs=1)
+        self.model.save_weights("model1.h5")
 
-def train():
-    model.fit(X, y, batch_size=64, epochs=1)
-    model.save_weights("model1.h5")
+    def load(self):
+        self.model.load_weights("model1.h5")
 
-def load():
-    model.load_weights("model1.h5")
+    def predict(self, index_max=20):
+        predicted = []
+        index = 0
+        for word in readdata():
+            word = word.split('.')[0]
+            input_word = [ord(char) for char in word.lower()]
+            input_word = pad_sequences([input_word], maxlen=maxlen)  
+            predicted_index = np.argmax(self.model.predict(input_word))
+            predicted_letter = chr(predicted_index)
+            predicted.append(word + predicted_letter)
+            index += 1
+            if index > index_max:
+                break
+        return predicted
 
-#load()
-train()
-
-for word in readdata():
-    word = word.split('.')[0]
-    input_word = [ord(char) for char in word.lower()]
-    input_word = pad_sequences([input_word], maxlen=maxlen)  
-    predicted_index = np.argmax(model.predict(input_word))
-    predicted_letter = chr(predicted_index)
-    print("Predicted letter for '{}' is '{}'.".format(word, predicted_letter))
-
-model.save_weights("predict_letter.h5")
+model = Model1()
+model.train()
+print(model.predict())
