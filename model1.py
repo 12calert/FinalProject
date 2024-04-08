@@ -27,7 +27,7 @@ class Model1():
     def load(self):
         self.model.load_weights("model1.h5")
 
-    def predict(self, index_max=20):
+    def generate(self, index_max=20):
         predicted = []
         index = 0
         for word in readdata():
@@ -42,6 +42,3 @@ class Model1():
                 break
         return predicted
 
-model = Model1()
-model.train()
-print(model.predict())

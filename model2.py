@@ -2,7 +2,6 @@ import tensorflow as tf
 from tensorflow.keras.layers import Embedding, MultiHeadAttention, Dense, LayerNormalization, Dropout
 from tensorflow.keras.models import Sequential
 from tensorflow.keras.preprocessing.sequence import pad_sequences
-import pandas as pd
 import numpy as np
 from read_csv import *
 
@@ -80,7 +79,7 @@ class Model2():
     def load(self):
         self.model.load_weights("model2.h5")
 
-    def predict(self, index_max=20):
+    def generate(self, index_max=20):
         predicted = []
         index = 0
         for word in readdata():
@@ -95,6 +94,5 @@ class Model2():
                 break
         return predicted
 
-model = Model2()
-model.train()
-print(model.predict())
+#model = Model2()
+#model.train()

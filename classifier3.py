@@ -2,9 +2,9 @@ import pandas as pd
 from sklearn.model_selection import train_test_split
 from tensorflow.keras.preprocessing.text import Tokenizer
 from tensorflow.keras.preprocessing.sequence import pad_sequences
+import tensorflow as tf
 from tensorflow.keras.models import Sequential
-from tensorflow.keras.layers import LSTM, Dense, Embedding, SpatialDropout1D
-
+from tensorflow.keras.layers import Embedding, Conv1D, GlobalMaxPooling1D, Dense, Dropout
 
 print("Loading datasets...")
 advers_df = pd.read_csv("advers.csv")
@@ -34,22 +34,25 @@ X_train, X_val, y_train, y_val = train_test_split(X, labels, test_size=0.2, rand
 max_features = len(tokenizer.word_index) + 1  # Vocabulary size
 embedding_size = 128
 
-# Build the model
+# Build the model using a CNN architecture
 model = Sequential()
 model.add(Embedding(max_features, embedding_size, input_length=max_length))
-model.add(SpatialDropout1D(0.2))
-model.add(LSTM(100, dropout=0.2, recurrent_dropout=0.2, return_sequences=True))
-model.add(LSTM(100, dropout=0.2, recurrent_dropout=0.2))
+model.add(Dropout(0.2))
+model.add(Conv1D(128, 3, activation='relu', padding='same'))
+model.add(Conv1D(128, 3, activation='relu', padding='same'))
+model.add(GlobalMaxPooling1D())
+model.add(Dense(128, activation='relu'))
+model.add(Dropout(0.2))
 model.add(Dense(1, activation='sigmoid'))
 
 model.compile(loss='binary_crossentropy', optimizer='adam', metrics=['accuracy'])
 
 def train():
     model.fit(X_train, y_train, validation_data=(X_val, y_val), epochs=1, batch_size=64)
-    model.save_weights("classifier.h5")
+    model.save_weights("classifier3.h5")
 
 def load():
-    model.load_weights("classifier.h5")
+    model.load_weights("classifier3.h5")
 
 def predict(domain_names):
     # Tokenize domain names
@@ -59,3 +62,4 @@ def predict(domain_names):
     # Predict
     predictions = model.predict(X_test)
     return predictions
+

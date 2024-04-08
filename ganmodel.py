@@ -118,7 +118,7 @@ def train(dataset, epochs):
         print ('Time for epoch {} is {} sec'.format(epoch + 1, time.time()-start))
     generator.save_weights("ganmodel.h5")
 
-def generate_domain_names(num_samples):
+def generate(num_samples):
 
     noise = tf.random.normal([num_samples, noise_dim])
     generated_domains_one_hot = generator(noise, training=False)
@@ -128,10 +128,5 @@ def generate_domain_names(num_samples):
 def load():
     generator.load_weights("ganmodel.h5")
 
-load()    
 # 5.8s per epoch on laptop
 #train(train_dataset, EPOCHS)
-# Now, let's generate some domain names
-generated_domain_names = generate_domain_names(10)
-for domain_name in generated_domain_names:
-    print(domain_name)
