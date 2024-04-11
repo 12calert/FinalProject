@@ -4,12 +4,12 @@ import ganmodel
 import classifier2
 import classifier3
 
-n_domains = 20
+n_domains = 5000
 model1 = Model1()
 model1.load()
 model1_domains = model1.generate(n_domains)
 
-model2 = Model1()
+model2 = Model2()
 model2.load()
 model2_domains = model2.generate(n_domains)
 
@@ -33,19 +33,12 @@ def score(predictions):
             model_score += 1
     return model_score  / len(predictions)
 
-print(predictions1)
-print(predictions2)
-print(predictions3)
-
+print("Classifier 1")
 print(score(predictions1))
 print(score(predictions2))
 print(score(predictions3))
 
-
-print(predictions4)
-print(predictions5)
-print(predictions6)
-
+print("Classifier 2")
 print(score(predictions4))
 print(score(predictions5))
 print(score(predictions6))

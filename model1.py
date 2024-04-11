@@ -21,7 +21,7 @@ class Model1():
         self.model.compile(optimizer="adam", loss="sparse_categorical_crossentropy", metrics=["accuracy"])
 
     def train(self):
-        self.model.fit(X, y, batch_size=64, epochs=1)
+        self.model.fit(X, y, batch_size=64, epochs=15)
         self.model.save_weights("model1.h5")
 
     def load(self):
@@ -42,3 +42,4 @@ class Model1():
                 break
         return predicted
 
+#TRAINED

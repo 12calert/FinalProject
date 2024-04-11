@@ -7,9 +7,9 @@ from read_csv import *
 char_set = "abcdefghijklmnopqrstuvwxyz0123456789-"
 char_set_size = len(char_set)
 domain_length = 10
-BUFFER_SIZE = 10000
+BUFFER_SIZE = 100000
 BATCH_SIZE = 256
-EPOCHS = 15
+EPOCHS = 25
 noise_dim = 100
 num_examples_to_generate = 16
 
@@ -130,3 +130,5 @@ def load():
 
 # 5.8s per epoch on laptop
 #train(train_dataset, EPOCHS)
+
+#TRAINED

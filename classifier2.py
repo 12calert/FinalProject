@@ -1,14 +1,11 @@
 import pandas as pd
+import tensorflow as tf
 from sklearn.model_selection import train_test_split
 from tensorflow.keras.preprocessing.text import Tokenizer
 from tensorflow.keras.preprocessing.sequence import pad_sequences
 from tensorflow.keras.models import Sequential
 from tensorflow.keras.layers import LSTM, Dense, Embedding, SpatialDropout1D
-
-
-print("Loading datasets...")
-advers_df = pd.read_csv("advers.csv")
-majestic_df = pd.read_csv("majestic_million.csv")
+from sklearn.metrics import classification_report, accuracy_score
 
 full_df = pd.read_csv("dga_domains_full.csv", names=["label", "source", "domain"])
 full_df = full_df[["label", "domain"]]
@@ -59,3 +56,31 @@ def predict(domain_names):
     # Predict
     predictions = model.predict(X_test)
     return predictions
+
+def normalize_predictions(predictions):
+    for i in range(len(predictions)):
+        if predictions[i][0] > 0.5:
+            predictions[i] = 1
+        else:
+            predictions[i] = 0
+    return predictions
+
+def test():
+    load()  # Make sure the model and tokenizer are loaded
+    print("Testing model")
+    # Load the test dataset
+    test_df = pd.read_csv("dga_domains.csv", names=["host","domain","class","subclass"])
+    test_df = test_df[["class", "domain"]]
+    test_df['class'] = test_df['class'].replace({'legit': 1, 'dga': 0})
+
+    # Predict classes for the test dataset
+    predictions = predict(test_df['domain'].values)
+    predictions = normalize_predictions(predictions)
+    # Evaluate the predictions
+    print("Classification Report:")
+    print(classification_report(test_df['class'].values, predictions))
+    print("Accuracy Score:")
+    print(accuracy_score(test_df['class'].values, predictions))
+
+#TRAINED
+test()
