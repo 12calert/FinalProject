@@ -1,2 +1,4 @@
 tensorflow
-sklearn
+pandas
+scikit-learn
+numpy
