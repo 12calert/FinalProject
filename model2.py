@@ -93,5 +93,3 @@ class Model2():
             if index > index_max:
                 break
         return predicted
-
-#TRAINED

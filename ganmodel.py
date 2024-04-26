@@ -127,8 +127,3 @@ def generate(num_samples):
 
 def load():
     generator.load_weights("ganmodel.h5")
-
-# 5.8s per epoch on laptop
-#train(train_dataset, EPOCHS)
-
-#TRAINED
